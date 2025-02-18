@@ -1,13 +1,207 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="es">
 <head>
-  <meta charset="utf-8">
-  <title>PartiturasLibrary</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biblioteca de Partituras</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.3/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-  <app-root></app-root>
+<body class="bg-gray-100">
+    <header class="bg-blue-900 text-white py-5">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Biblioteca de Partituras</h1>
+            <div class="search">
+                <input type="text" placeholder="Buscar partituras..." id="searchInput" class="px-4 py-2 rounded-lg text-black">
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="actions flex gap-4 mb-6">
+            <button onclick="showNewFolderModal()" class="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors">Nueva Carpeta</button>
+            <button onclick="showUploadModal()" class="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors">Subir Partitura</button>
+        </div>
+
+        <div class="sort-options mb-6">
+            <select id="sortSelect" onchange="sortFiles()" class="px-4 py-2 rounded-lg border border-gray-300">
+                <option value="name">Ordenar por nombre</option>
+                <option value="date">Ordenar por fecha</option>
+                <option value="composer">Ordenar por compositor</option>
+            </select>
+        </div>
+
+        <div class="library-container bg-white p-6 rounded-lg shadow-lg grid grid-cols-[250px_1fr] gap-6">
+            <div class="folders border-r border-gray-200 pr-6" id="folderList">
+                <!-- Las carpetas se generarán dinámicamente -->
+            </div>
+            <div class="files grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="fileList">
+                <!-- Los archivos se generarán dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nueva Carpeta -->
+    <div id="newFolderModal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden">
+        <div class="modal-content bg-white p-6 rounded-lg w-11/12 max-w-md absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <h2 class="text-xl font-bold mb-4">Nueva Carpeta</h2>
+            <input type="text" id="folderName" placeholder="Nombre de la carpeta" class="w-full px-4 py-2 mb-4 rounded-lg border border-gray-300">
+            <div class="flex gap-4">
+                <button onclick="createFolder()" class="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors">Crear</button>
+                <button onclick="closeModal('newFolderModal')" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Subir Archivo -->
+    <div id="uploadModal" class="modal fixed inset-0 bg-black bg-opacity-50 hidden">
+        <div class="modal-content bg-white p-6 rounded-lg w-11/12 max-w-md absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <h2 class="text-xl font-bold mb-4">Subir Partitura</h2>
+            <input type="file" id="fileInput" accept=".pdf" class="w-full px-4 py-2 mb-4 rounded-lg border border-gray-300">
+            <input type="text" id="composer" placeholder="Compositor" class="w-full px-4 py-2 mb-4 rounded-lg border border-gray-300">
+            <input type="text" id="instrument" placeholder="Instrumento" class="w-full px-4 py-2 mb-4 rounded-lg border border-gray-300">
+            <div class="flex gap-4">
+                <button onclick="uploadFile()" class="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors">Subir</button>
+                <button onclick="closeModal('uploadModal')" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estructura de datos
+        let folders = [
+            { id: 1, name: 'Piano' },
+            { id: 2, name: 'Violín' },
+            { id: 3, name: 'Guitarra' }
+        ];
+
+        let files = [
+            { id: 1, name: 'Sonata No. 14', composer: 'Beethoven', folderId: 1, date: '2024-03-01' },
+            { id: 2, name: 'Nocturno Op. 9', composer: 'Chopin', folderId: 1, date: '2024-03-02' }
+        ];
+
+        let currentFolderId = null;
+
+        // Funciones principales
+        function renderFolders() {
+            const folderList = document.getElementById('folderList');
+            folderList.innerHTML = folders.map(folder => `
+                <div class="folder ${currentFolderId === folder.id ? 'active' : ''}" 
+                     onclick="selectFolder(${folder.id})"
+                     ondblclick="showRenameFolderPrompt(${folder.id})">
+                    📁 ${folder.name}
+                </div>
+            `).join('');
+        }
+
+        function renderFiles() {
+            const fileList = document.getElementById('fileList');
+            const filteredFiles = currentFolderId 
+                ? files.filter(file => file.folderId === currentFolderId)
+                : files;
+
+            fileList.innerHTML = filteredFiles.map(file => `
+                <div class="file-card bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow">
+                    <h3 class="text-lg font-bold">${file.name}</h3>
+                    <p class="text-sm text-gray-600">Compositor: ${file.composer}</p>
+                    <p class="text-sm text-gray-600">Fecha: ${file.date}</p>
+                </div>
+            `).join('');
+        }
+
+        function showNewFolderModal() {
+            document.getElementById('newFolderModal').style.display = 'block';
+        }
+
+        function showUploadModal() {
+            document.getElementById('uploadModal').style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function createFolder() {
+            const folderName = document.getElementById('folderName').value;
+            if (folderName.trim()) {
+                folders.push({
+                    id: folders.length + 1,
+                    name: folderName
+                });
+                renderFolders();
+                closeModal('newFolderModal');
+                document.getElementById('folderName').value = '';
+            }
+        }
+
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const composer = document.getElementById('composer').value;
+            const instrument = document.getElementById('instrument').value;
+
+            if (fileInput.files.length > 0 && composer && instrument) {
+                const file = fileInput.files[0];
+                files.push({
+                    id: files.length + 1,
+                    name: file.name,
+                    composer: composer,
+                    folderId: currentFolderId,
+                    date: new Date().toISOString().split('T')[0]
+                });
+                renderFiles();
+                closeModal('uploadModal');
+                
+                // Limpiar campos
+                fileInput.value = '';
+                document.getElementById('composer').value = '';
+                document.getElementById('instrument').value = '';
+            }
+        }
+
+        function selectFolder(folderId) {
+            currentFolderId = folderId;
+            renderFolders();
+            renderFiles();
+        }
+
+        function showRenameFolderPrompt(folderId) {
+            const folder = folders.find(f => f.id === folderId);
+            const newName = prompt('Nuevo nombre para la carpeta:', folder.name);
+            if (newName && newName.trim()) {
+                folder.name = newName.trim();
+                renderFolders();
+            }
+        }
+
+        function sortFiles() {
+            const sortType = document.getElementById('sortSelect').value;
+            files.sort((a, b) => {
+                switch (sortType) {
+                    case 'name':
+                        return a.name.localeCompare(b.name);
+                    case 'date':
+                        return new Date(b.date) - new Date(a.date);
+                    case 'composer':
+                        return a.composer.localeCompare(b.composer);
+                    default:
+                        return 0;
+                }
+            });
+            renderFiles();
+        }
+
+        // Inicialización
+        renderFolders();
+        renderFiles();
+
+        // Búsqueda
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            files = files.filter(file => 
+                file.name.toLowerCase().includes(searchTerm) ||
+                file.composer.toLowerCase().includes(searchTerm)
+            );
+            renderFiles();
+        });
+    </script>
 </body>
 </html>
